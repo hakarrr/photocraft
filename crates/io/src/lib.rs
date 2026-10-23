@@ -173,6 +173,15 @@ pub fn open_warnings(doc: &Document) -> Vec<String> {
         {
             out.push(warning);
         }
+        if let LayerContent::Smart(smart) = &l.content {
+            for filter in &smart.smart_filters {
+                if let Some(adjustment) = smart_map::vibrance_adjustment(filter)
+                    && let Some(warning) = vibrance_balance_warning(&l.name, &adjustment)
+                {
+                    out.push(warning);
+                }
+            }
+        }
         if let LayerContent::Adjustment(Adjustment::ColorLookup { name: _, size, lut, .. }) = &l.content {
             match lut.as_deref().zip(photocraft_doc::adjust::lut3d_len(*size)) {
                 Some((table, len)) if table.len() >= len => {}
