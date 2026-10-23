@@ -383,6 +383,9 @@ impl Ctx<'_> {
                     adjust_map::label(k)
                 ));
             }
+            if let Some(warning) = crate::vibrance_balance_warning(&name, &adj) {
+                self.warn(warning);
+            }
             LayerContent::Adjustment(adj)
         } else if let Some(block) = rec.block(b"TySh") {
             // Only canonical type data with a safe transform can become a text layer. A retained
