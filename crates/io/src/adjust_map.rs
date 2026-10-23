@@ -469,12 +469,15 @@ fn versioned(d: &[u8]) -> Option<Descriptor> {
 /// (saturation), both integers in -100..=100, and the legacy white-balance keys `temperature`
 /// and `tint`. Photoshop omits a key whose value is 0.
 fn parse_vibrance(d: &[u8]) -> Option<Adjustment> {
-    let desc = versioned(d)?;
+    vibrance_from_descriptor(&versioned(d)?)
+}
+
+pub(crate) fn vibrance_from_descriptor(desc: &Descriptor) -> Option<Adjustment> {
     let get = |k: &str| {
         if desc.get(k).is_none() {
             return Some(0.0);
         }
-        desc_num(&desc, k).filter(|v| v.is_finite()).map(|v| v.clamp(-100.0, 100.0))
+        desc_num(desc, k).filter(|v| v.is_finite()).map(|v| v.clamp(-100.0, 100.0))
     };
     Some(Adjustment::Vibrance { vibrance: get("vibrance")?, saturation: get("Strt")?, temperature: get("temperature")?, tint: get("tint")? })
 }
