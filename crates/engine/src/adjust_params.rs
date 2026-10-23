@@ -1606,7 +1606,16 @@ mod tests {
                 let mut s = colourful("rgb", depth);
                 let before = pixels(&s);
                 let steps = s.active().unwrap().history.past_len();
-                s.execute(&format!("image.adjustments.{kind}"), sample(kind)).unwrap_or_else(|e| panic!("{kind} @{depth}: {e}"));
+                let mut params = sample(kind);
+                if *kind == "vibrance" {
+                    let error = s.execute("image.adjustments.vibrance", params.clone()).expect_err("unsupported balance cannot be baked");
+                    assert!(error.to_string().contains("temperature/tint rendering is unsupported"), "{error}");
+                    assert_eq!(pixels(&s), before, "rejected balance changed pixels @{depth}");
+                    assert_eq!(s.active().unwrap().history.past_len(), steps, "rejected balance changed history @{depth}");
+                    params["temperature"] = json!(0);
+                    params["tint"] = json!(0);
+                }
+                s.execute(&format!("image.adjustments.{kind}"), params).unwrap_or_else(|e| panic!("{kind} @{depth}: {e}"));
                 assert_ne!(pixels(&s), before, "{kind} @{depth} changed nothing");
                 assert_eq!(s.active().unwrap().history.past_len(), steps + 1, "{kind}: one history step");
                 // Identity params leave the pixels alone (within one 8-bit step).
