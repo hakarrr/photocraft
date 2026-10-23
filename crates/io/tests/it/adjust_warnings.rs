@@ -109,3 +109,19 @@ fn short_color_lookup_table_warns_on_open() {
     let (_, warnings) = reopen(none, "x.pcraft", &ExportOptions::default());
     assert!(warnings.iter().any(|w| w.contains("Teal Look") && w.contains("no usable table")), "{warnings:?}");
 }
+
+#[test]
+fn preserved_vibrance_balance_warns_on_psd_psb_and_native_open() {
+    for (temperature, tint) in [(0.0, 0.0), (25.0, 0.0), (0.0, -30.0), (15.0, 20.0)] {
+        for path in ["x.psd", "x.psb", "x.pcraft"] {
+            let adj = Adjustment::Vibrance { vibrance: 12.0, saturation: -4.0, temperature, tint };
+            let (doc, warnings) = reopen(adj.clone(), path, &ExportOptions { force_psb: path.ends_with("psb"), ..Default::default() });
+            assert_eq!(doc.layers[0].content, LayerContent::Adjustment(adj));
+            let notes: Vec<_> = warnings.iter().filter(|w| w.contains("Teal Look") && w.contains("Vibrance temperature")).collect();
+            assert_eq!(notes.len(), usize::from(temperature != 0.0 || tint != 0.0), "{path}: {warnings:?}");
+            for note in notes {
+                assert!(note.contains("preserved") && note.contains("rendering is unsupported"), "{note}");
+            }
+        }
+    }
+}
