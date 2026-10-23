@@ -470,8 +470,13 @@ fn versioned(d: &[u8]) -> Option<Descriptor> {
 /// and `tint`. Photoshop omits a key whose value is 0.
 fn parse_vibrance(d: &[u8]) -> Option<Adjustment> {
     let desc = versioned(d)?;
-    let get = |k: &str| desc_num(&desc, k).unwrap_or(0.0).clamp(-100.0, 100.0);
-    Some(Adjustment::Vibrance { vibrance: get("vibrance"), saturation: get("Strt"), temperature: get("temperature"), tint: get("tint") })
+    let get = |k: &str| {
+        if desc.get(k).is_none() {
+            return Some(0.0);
+        }
+        desc_num(&desc, k).filter(|v| v.is_finite()).map(|v| v.clamp(-100.0, 100.0))
+    };
+    Some(Adjustment::Vibrance { vibrance: get("vibrance")?, saturation: get("Strt")?, temperature: get("temperature")?, tint: get("tint")? })
 }
 
 /// `blnc` (Adobe spec, "Color Balance"): shadows, midtones and highlights as three i16 each
@@ -1295,6 +1300,48 @@ mod tests {
 
     fn vdesc(d: Descriptor) -> Vec<u8> {
         VersionedDescriptor::new(d).to_bytes()
+    }
+
+    #[test]
+    fn malformed_vibrance_fields_remain_opaque_and_roundtrip() {
+        for key in ["temperature", "tint", "vibrance", "Strt"] {
+            for value in [
+                Value::Double(f64::NAN),
+                Value::Double(f64::INFINITY),
+                Value::Double(f64::NEG_INFINITY),
+                Value::Double(f64::MAX),
+                Value::Double(-f64::MAX),
+                Value::Boolean(true),
+            ] {
+                let raw = vdesc(Descriptor::new("null").with(key, value));
+                let adj = parse(b"vibA", &raw, None, Channels::Rgb);
+                assert!(matches!(adj, Adjustment::Unsupported { .. }), "{key}");
+                assert_eq!(write(&adj), vec![(*b"vibA", raw)]);
+                let json = serde_json::to_string(&adj).unwrap();
+                assert_eq!(serde_json::from_str::<Adjustment>(&json).unwrap(), adj);
+            }
+        }
+    }
+
+    #[test]
+    fn vibrance_missing_fields_default_but_finite_values_keep_clamping() {
+        assert_eq!(
+            parse(b"vibA", &vdesc(Descriptor::new("null")), None, Channels::Rgb),
+            Adjustment::Vibrance { vibrance: 0.0, saturation: 0.0, temperature: 0.0, tint: 0.0 }
+        );
+        for (value, expected) in [(-1000.0, -100.0), (-42.5, -42.5), (0.0, 0.0), (67.25, 67.25), (1000.0, 100.0)] {
+            let raw = vdesc(
+                Descriptor::new("null")
+                    .with("vibrance", Value::Double(value))
+                    .with("Strt", Value::Double(value))
+                    .with("temperature", Value::Double(value))
+                    .with("tint", Value::Double(value)),
+            );
+            assert_eq!(
+                parse(b"vibA", &raw, None, Channels::Rgb),
+                Adjustment::Vibrance { vibrance: expected, saturation: expected, temperature: expected, tint: expected }
+            );
+        }
     }
 
     #[test]
