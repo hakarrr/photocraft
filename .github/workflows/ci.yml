@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 98de85c64ea677bc1cb0e8e489b3d1369deb92c4
+          ref: 6719f1813e84e96129fc31676cc945d51be0e736
           repository: storytold/photocraft
           persist-credentials: false
       - name: Apply exact reviewed conflict-resolved candidate
